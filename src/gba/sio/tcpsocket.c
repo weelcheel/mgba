@@ -30,9 +30,9 @@ void GBASIOTCPSocketDestroy(struct GBASIOTCPSocket* tcp) {
     // @TODO: cleanup socket
 }
 
-bool GBASIOTCPSocketConnect(struct GBASIOTCPSocket* tcp, const struct Address* address) {
+bool GBASIOTCPSocketConnect(struct GBASIOTCPSocket* tcp) {
     // @TODO: create and connect socket
-    return false;
+    return tcp->driver.init != NULL;
 }
 
 bool GBASIOTCPSocketIsConnected(struct GBASIOTCPSocket* tcp) {

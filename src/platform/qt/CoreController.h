@@ -27,6 +27,7 @@
 #endif
 #ifdef M_CORE_GBA
 #include <mgba/internal/gba/sio/dolphin.h>
+#include <mgba/internal/gba/sio/tcpsocket.h>
 #endif
 
 #ifdef M_CORE_GBA
@@ -124,6 +125,7 @@ public:
 
 #ifdef M_CORE_GBA
 	bool isDolphinConnected() const { return !SOCKET_FAILED(m_dolphin.data); }
+	bool isTcpSocketConnected() const { return false; }
 #endif
 
 	mCacheSet* graphicCaches();
@@ -208,6 +210,9 @@ public slots:
 
 	bool attachDolphin(const Address& address);
 	void detachDolphin();
+
+	bool attachTcpSocket();
+	void detachTcpSocket();
 #endif
 
 	void setAVStream(mAVStream*);
@@ -329,6 +334,7 @@ private:
 	MultiplayerController* m_multiplayer = nullptr;
 #ifdef M_CORE_GBA
 	GBASIODolphin m_dolphin;
+	GBASIOTCPSocket m_tcpSocket;
 #endif
 
 #ifdef ENABLE_DEBUGGERS

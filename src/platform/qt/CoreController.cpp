@@ -48,6 +48,7 @@ CoreController::CoreController(mCore* core, QObject* parent)
 
 #ifdef M_CORE_GBA
 	GBASIODolphinCreate(&m_dolphin);
+	GBASIOTCPSocketCreate(&m_tcpSocket);
 #endif
 
 #ifdef ENABLE_DEBUGGERS
@@ -438,6 +439,32 @@ void CoreController::detachDolphin() {
 	}
 	GBASIODolphinDestroy(&m_dolphin);
 }
+
+bool CoreController::attachTcpSocket() {
+	if (platform() != mPLATFORM_GBA) {
+		return false;
+	}
+
+	if (GBASIOTCPSocketConnect(&m_tcpSocket)) {
+		m_threadContext.core->setPeripheral(m_threadContext.core, mPERIPH_GBA_LINK_PORT, &m_tcpSocket.driver);
+		QMessageBox* fail = new QMessageBox(QMessageBox::Warning, tr("Attached"),
+		                                    tr("SIO device initialized and attached."),
+		                                    QMessageBox::Ok);
+		fail->setAttribute(Qt::WA_DeleteOnClose);
+		fail->show();
+		return true;
+	}
+
+	return false;
+}
+
+void CoreController::detachTcpSocket() {
+	if (platform() == mPLATFORM_GBA) {
+		m_threadContext.core->setPeripheral(m_threadContext.core, mPERIPH_GBA_LINK_PORT, NULL);
+	}
+	GBASIOTCPSocketDestroy(&m_tcpSocket);
+}
+
 #endif
 
 void CoreController::setOverride(std::unique_ptr<Override> override) {

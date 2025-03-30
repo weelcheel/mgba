@@ -19,7 +19,7 @@ struct GBASIOTCPSocket {
 
 void GBASIOTCPSocketCreate(struct GBASIOTCPSocket*);
 void GBASIOTCPSocketDestroy(struct GBASIOTCPSocket*);
-bool GBASIOTCPSocketConnect(struct GBASIOTCPSocket*, const struct Address* address);
+bool GBASIOTCPSocketConnect(struct GBASIOTCPSocket*);
 bool GBASIOTCPSocketIsConnected(struct GBASIOTCPSocket*);
 
 CXX_GUARD_END
