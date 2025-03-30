@@ -206,6 +206,7 @@ set(UI_FILES
 	ShaderSelector.ui
 	ShortcutView.ui
 	TileView.ui
+	TcpConnector.ui
 	VideoView.ui)
 
 set(GBA_SRC
@@ -213,6 +214,7 @@ set(GBA_SRC
 	BattleChipUpdater.cpp
 	BattleChipView.cpp
 	DolphinConnector.cpp
+	TcpConnector.cpp
 	GBAOverride.cpp)
 
 set(GB_SRC

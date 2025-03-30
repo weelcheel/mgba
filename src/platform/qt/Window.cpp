@@ -33,6 +33,7 @@
 #include "DebuggerConsoleController.h"
 #include "Display.h"
 #include "DolphinConnector.h"
+#include "TcpConnector.h"
 #include "CoreController.h"
 #include "ForwarderView.h"
 #include "FrameView.h"
@@ -1416,6 +1417,9 @@ void Window::setupMenu(QMenuBar* menubar) {
 #ifdef M_CORE_GBA
 	auto dolphin = m_actions.addAction(tr("Connect to Dolphin..."), "connectDolphin", openNamedTView<DolphinConnector>(&m_dolphinView, this), "file");
 	m_platformActions.insert(mPLATFORM_GBA, dolphin);
+
+	auto tcpSocket = m_actions.addAction(tr("Connect to TCP socket..."), "connectTcpSocket", openNamedTView<TcpConnector>(&m_tcpView, this), "file");
+	m_platformActions.insert(mPLATFORM_GBA, tcpSocket);
 #endif
 
 	m_actions.addSeparator("file");
