@@ -397,6 +397,7 @@ void GBASIONormal8FinishTransfer(struct GBASIO* sio, uint8_t data, uint32_t cycl
 }
 
 void GBASIONormal32FinishTransfer(struct GBASIO* sio, uint32_t data, uint32_t cyclesLate) {
+	mLOG(GBA_SIO, DEBUG, "NORMAL32 finish: SIODATA32 <- %04X", data);
 	sio->siocnt = GBASIONormalClearStart(sio->siocnt);
 	sio->p->memory.io[GBA_REG(SIODATA32_LO)] = data;
 	sio->p->memory.io[GBA_REG(SIODATA32_HI)] = data >> 16;

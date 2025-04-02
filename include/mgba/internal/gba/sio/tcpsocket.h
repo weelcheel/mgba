@@ -10,11 +10,22 @@ CXX_GUARD_START
 
 #include <mgba-util/socket.h>
 
+enum TcpState {
+    TCP_STATE_INIT,
+    TCP_STATE_HANDSHAKE,
+    TCP_STATE_CONNECT,
+    TCP_STATE_CONNECTING,
+    TCP_STATE_CONNECTED,
+    TCP_STATE_DISCONNECTED,
+};
+
 struct GBASIOTCPSocket {
     struct GBASIODriver driver;
     struct mTimingEvent event;
 
     bool isActive;
+    enum TcpState state;
+    enum TcpState nextState;
 };
 
 void GBASIOTCPSocketCreate(struct GBASIOTCPSocket*);
