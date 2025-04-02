@@ -3,6 +3,8 @@
 #include <mgba/internal/gba/gba.h>
 #include <mgba/internal/gba/io.h>
 
+const uint16_t TCP_PORT = 6969;
+
 static bool GBASIOTCPSocketInit(struct GBASIODriver* driver);
 static void GBASIOTCPSocketReset(struct GBASIODriver* driver);
 static void GBASIOTCPSocketSetMode(struct GBASIODriver* driver, enum GBASIOMode mode);
@@ -32,16 +34,27 @@ void GBASIOTCPSocketCreate(struct GBASIOTCPSocket* tcp) {
     tcp->isActive = false;
     tcp->state = TCP_STATE_INIT;
     tcp->nextState = TCP_STATE_INIT;
+    tcp->isConnected = false;
+
+    // debug
+    tcp->address = (struct Address*) malloc(sizeof(struct Address));
+    tcp->address->version = IPV4;
+    struct in_addr ip_addr;
+    inet_pton(AF_INET, "127.0.0.1", &(ip_addr.s_addr));
+    tcp->address->ipv4 = ip_addr.s_addr;
+    tcp->port = TCP_PORT;
 }
 
 void GBASIOTCPSocketDestroy(struct GBASIOTCPSocket* tcp) {
-    // @TODO: cleanup socket
     mLOG(GBA_SIO, DEBUG, "TCP Socket Driver: Destroying SIO TCP socket driver...");
+    if (!SOCKET_FAILED(tcp->tcpSocket)) {
+        SocketClose(tcp->tcpSocket);
+        tcp->tcpSocket = INVALID_SOCKET;
+    }
 }
 
 bool GBASIOTCPSocketConnect(struct GBASIOTCPSocket* tcp) {
-    // @TODO: create and connect socket
-    mLOG(GBA_SIO, DEBUG, "TCP Socket Driver: Connecting SIO TCP socket...");
+    mLOG(GBA_SIO, DEBUG, "TCP Socket Driver: Setting SIO TCP socket data...");
     return tcp->driver.init != NULL;
 }
 
@@ -115,7 +128,29 @@ static bool GBASIOTCPSocketStart(struct GBASIODriver* driver) {
             }
             break;
         case TCP_STATE_CONNECTING:
-            //@TODO: get URL string from value and connect TCP socket
+            tcp->isActive = true;
+            if (!tcp->isConnected) {
+                if (!SOCKET_FAILED(tcp->tcpSocket)) {
+                    SocketClose(tcp->tcpSocket);
+                    tcp->tcpSocket = INVALID_SOCKET;
+                }
+                if (!tcp->port) {
+                    tcp->port = TCP_PORT;
+                }
+
+                tcp->tcpSocket = SocketConnectTCP(tcp->port, tcp->address);
+                SocketSetBlocking(tcp->tcpSocket, false);
+                SocketSetTCPPush(tcp->tcpSocket, true);
+
+                struct in_addr ip_addr;
+                char str[INET_ADDRSTRLEN];
+                ip_addr.s_addr = tcp->address->ipv4;
+                inet_ntop(AF_INET, &(ip_addr.s_addr), str, INET_ADDRSTRLEN);
+                mLOG(GBA_SIO, DEBUG, "TCP Socket Driver: Opened socket to %s:%d", str, tcp->port);
+
+                tcp->nextState = TCP_STATE_CONNECTED;
+                tcp->isConnected = true;
+            }
             break;
     }
 
@@ -132,7 +167,9 @@ static uint32_t GBASIOTCPSocketFinishNormal32(struct GBASIODriver* driver) {
             result = 0xBAC7;
             break;
         case TCP_STATE_CONNECTING:
-            result = 0xBAC8;
+            if (tcp->isConnected) {
+                result = 0xBAC8;
+            }
             break;
     }
 

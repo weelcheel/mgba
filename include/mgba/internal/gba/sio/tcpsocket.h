@@ -22,11 +22,18 @@ enum TcpState {
 struct GBASIOTCPSocket {
     struct GBASIODriver driver;
     struct mTimingEvent event;
+    
+    Socket tcpSocket;
+    struct Address* address;
+    short port;
 
     bool isActive;
+    bool isConnected;
     enum TcpState state;
     enum TcpState nextState;
 };
+
+extern const uint16_t TCP_PORT;
 
 void GBASIOTCPSocketCreate(struct GBASIOTCPSocket*);
 void GBASIOTCPSocketDestroy(struct GBASIOTCPSocket*);
