@@ -770,6 +770,11 @@ if (USE_DISCORD_RPC)
 	include_directories(AFTER ${CMAKE_CURRENT_SOURCE_DIR}/src/third-party/discord-rpc/include)
 endif()
 
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src/third-party/libwebsockets libwebsockets EXCLUDE_FROM_ALL)
+list(APPEND FEATURES LIBWEBSOCKETS)
+include_directories(AFTER ${CMAKE_CURRENT_SOURCE_DIR}/src/third-party/libwebsockets/build/include)
+include_directories(AFTER ${CMAKE_CURRENT_SOURCE_DIR}/src/third-party/libwebsockets/build/include/libwebsockets)
+
 if(ENABLE_SCRIPTING)
 	list(APPEND ENABLES SCRIPTING)
 	find_feature(USE_JSON_C "json-c")
