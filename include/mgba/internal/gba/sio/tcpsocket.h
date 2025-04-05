@@ -16,8 +16,7 @@ enum TcpState {
     TCP_STATE_INIT_URL_TRANSFER,
     TCP_STATE_PORT_TRANSFER,
     TCP_STATE_CONNECTING,
-    TCP_STATE_RECEIVE_FROM_GBA,
-    TCP_STATE_SEND_TO_GBA,
+    TCP_STATE_CONNECTED,
     TCP_STATE_DISCONNECTED,
 };
 
@@ -53,7 +52,10 @@ struct GBASIOTCPSocket {
     bool isActive;
     bool isConnected;
 
+    uint32_t inValue;
+
     enum TcpState state;
+    enum TcpState nextState;
     enum ErrorState errorState;
 
     uint32_t ipAddress;
@@ -69,8 +71,6 @@ struct GBASIOTCPSocket {
     struct TcpData** dataToSendQueue;
     struct TcpData* currentDataToSend;
     struct TcpData* currentDataToReceive;
-
-    uint32_t result;
 };
 
 void GBASIOTCPSocketCreate(struct GBASIOTCPSocket* tcp);
