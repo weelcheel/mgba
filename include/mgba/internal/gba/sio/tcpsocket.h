@@ -28,9 +28,8 @@ enum ErrorState {
 };
 
 enum PacketReadingState {
-    PACKET_READING_STATE_HEADER,
+    PACKET_READING_STATE_MAGIC,
     PACKET_READING_STATE_DATA_LENGTH,
-    PACKET_READING_STATE_SHOULD_MERGE,
     PACKET_READING_STATE_DATA,
 };
 
@@ -38,8 +37,7 @@ struct TcpData {
     struct TcpData* next;
 
     uint16_t numBytes;
-    uint8_t* data;
-    bool shouldMergeNext; // if true, the next data will be merged with this one
+    uint8_t data[4096];
 };
 
 struct GBASIOTCPSocket {
@@ -48,7 +46,6 @@ struct GBASIOTCPSocket {
     struct GBASIODriver driver;
     struct mTimingEvent event;
 
-    Socket socket;
     bool isActive;
     bool isConnected;
 
@@ -61,16 +58,21 @@ struct GBASIOTCPSocket {
     uint32_t ipAddress;
     uint16_t port;
 
-    uint8_t incompletePacketBytes[2048];
+    uint8_t incompletePacketBytes[8192];
     uint16_t incompletePacketBytesCount;
     uint16_t incompleteDataBytesToRead;
-    bool shouldMergeNextIncompleteData;
 
-    enum PacketReadingState packetReadingState;
-    struct TcpData** receivedDataQueue;
-    struct TcpData** dataToSendQueue;
-    struct TcpData* currentDataToSend;
-    struct TcpData* currentDataToReceive;
+    enum PacketReadingState fromServerPacketReadingState;
+    struct TcpData** dataToSendToGBAQueue;
+    struct TcpData** dataToSendToServerQueue;
+
+    struct TcpData* currentDataToSendToGBA;
+    uint16_t currentDataToSendToGBABytesSent;
+
+    uint8_t incomingDataBuffer[1024];
+    uint16_t incomingDataBufferCount;
+    uint16_t expectedIncomingBytesToRead;
+    bool isExpectingIncomingData;
 };
 
 void GBASIOTCPSocketCreate(struct GBASIOTCPSocket* tcp);
