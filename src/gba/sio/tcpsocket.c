@@ -183,6 +183,9 @@ static void GBASIOTCPSocketReadPacketFromServer(struct GBASIOTCPSocket* tcp) {
         memcpy(tcp->incompletePacketBytes + tcp->incompletePacketBytesCount, buffer, readBytes);
         tcp->incompletePacketBytesCount += readBytes;
     }
+    else {
+        return;
+    }
 
     bool shouldKeepReading = true;
     while (shouldKeepReading) {
