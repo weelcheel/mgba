@@ -73,6 +73,8 @@ struct GBASIOTCPSocket {
     uint16_t incomingDataBufferCount;
     uint16_t expectedIncomingBytesToRead;
     bool isExpectingIncomingData;
+
+    uint16_t tcpPollCounter;
 };
 
 void GBASIOTCPSocketCreate(struct GBASIOTCPSocket* tcp);

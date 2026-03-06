@@ -10,6 +10,9 @@
 #define TCP_PORT 42069
 #define POLL_WAIT 500
 
+#define EVENT_INTERVAL (CLOCK_GRAIN * 4)
+#define TCP_POLL_INTERVAL 4
+
 #define TCP_DATA_NOOP           0xFFFFFFFF
 #define TCP_DATA_SUCCESS        0x0710
 #define TCP_DATA_FAILURE        0x0711
@@ -179,7 +182,7 @@ static void GBASIOTCPSocketReadPacketFromServer(struct GBASIOTCPSocket* tcp) {
 
     // add the data to the incomplete packet buffer
     if (readBytes > 0) {
-        mLOG(GBA_SIO, INFO, "TCP Socket Driver: Received %d bytes of data from the server", readBytes);
+        mLOG(GBA_SIO, DEBUG, "TCP Socket Driver: Received %d bytes of data from the server", readBytes);
         memcpy(tcp->incompletePacketBytes + tcp->incompletePacketBytesCount, buffer, readBytes);
         tcp->incompletePacketBytesCount += readBytes;
     }
@@ -200,20 +203,17 @@ static void GBASIOTCPSocketReadPacketFromServer(struct GBASIOTCPSocket* tcp) {
                     }
                     memmove(tcp->incompletePacketBytes, tcp->incompletePacketBytes + 4, tcp->incompletePacketBytesCount - 4);
                     tcp->incompletePacketBytesCount -= 4;
-                    memset(tcp->incompletePacketBytes + tcp->incompletePacketBytesCount, 0, sizeof(tcp->incompletePacketBytes) - tcp->incompletePacketBytesCount);
                     shouldKeepReading = true;
                 }
                 break;
             case PACKET_READING_STATE_DATA_LENGTH:
                 if (tcp->incompletePacketBytesCount >= 2) {
-                    // read the first two bytes of the incomplete packet as a 16 bit integer
                     uint16_t dataLength = *(uint16_t*) (tcp->incompletePacketBytes);
                     tcp->incompleteDataBytesToRead = dataLength;
                     tcp->fromServerPacketReadingState = PACKET_READING_STATE_DATA;
                     
                     memmove(tcp->incompletePacketBytes, tcp->incompletePacketBytes + 2, tcp->incompletePacketBytesCount - 2);
                     tcp->incompletePacketBytesCount -= 2;
-                    memset(tcp->incompletePacketBytes + tcp->incompletePacketBytesCount, 0, sizeof(tcp->incompletePacketBytes) - tcp->incompletePacketBytesCount);
                     shouldKeepReading = true;
                 }
                 break;
@@ -221,14 +221,13 @@ static void GBASIOTCPSocketReadPacketFromServer(struct GBASIOTCPSocket* tcp) {
                 if (tcp->incompletePacketBytesCount >= tcp->incompleteDataBytesToRead) {
                     uint8_t data[tcp->incompleteDataBytesToRead];
                     memcpy(data, tcp->incompletePacketBytes, tcp->incompleteDataBytesToRead);
-                    mLOG(GBA_SIO, INFO, "TCP Socket Driver: Queueing %d bytes of data to send to the GBA", tcp->incompleteDataBytesToRead);
+                    mLOG(GBA_SIO, DEBUG, "TCP Socket Driver: Queueing %d bytes of data to send to the GBA", tcp->incompleteDataBytesToRead);
                     TcpDataQueuePush(tcp->dataToSendToGBAQueue, data, tcp->incompleteDataBytesToRead);
 
                     tcp->fromServerPacketReadingState = PACKET_READING_STATE_MAGIC;
                     
                     memmove(tcp->incompletePacketBytes, tcp->incompletePacketBytes + tcp->incompleteDataBytesToRead, tcp->incompletePacketBytesCount - tcp->incompleteDataBytesToRead);
                     tcp->incompletePacketBytesCount -= tcp->incompleteDataBytesToRead;
-                    memset(tcp->incompletePacketBytes + tcp->incompletePacketBytesCount, 0, sizeof(tcp->incompletePacketBytes) - tcp->incompletePacketBytesCount);
                     shouldKeepReading = true;
 
                     tcp->incompleteDataBytesToRead = 0;
@@ -255,13 +254,13 @@ static void GBASIOTCPSocketSendPacketToServer(struct GBASIOTCPSocket* tcp, struc
     memcpy(dataToSend + 6, data->data, data->numBytes);
 
     uint32_t sentBytes = SocketSend(sTcpSocket, dataToSend, data->numBytes + 6);
-    mLOG(GBA_SIO, INFO, "TCP Socket Driver: Sent %d bytes of data to the server", sentBytes);
+    mLOG(GBA_SIO, DEBUG, "TCP Socket Driver: Sent %d bytes of data to the server", sentBytes);
 }
 
 static void GBASIOTCPSocketProcessEvents(struct mTiming* timing, void* context, uint32_t cyclesLate) {
     struct GBASIOTCPSocket* tcp = (struct GBASIOTCPSocket*) context;
 
-    int32_t nextEvent = CLOCK_GRAIN;
+    int32_t nextEvent = EVENT_INTERVAL;
     mTimingSchedule(timing, &tcp->event, nextEvent);
 
     if (!tcp || !tcp->isActive) {
@@ -306,6 +305,7 @@ static void GBASIOTCPSocketProcessEvents(struct mTiming* timing, void* context, 
                 tcp->incompletePacketBytesCount = 0;
                 tcp->incompleteDataBytesToRead = 0;
                 memset(tcp->incompletePacketBytes, 0, sizeof(tcp->incompletePacketBytes));
+                tcp->tcpPollCounter = 0;
 
                 mLOG(GBA_SIO, INFO, "TCP Socket Driver: Socket %d Connected to %s:%d", sTcpSocket, ipAddrStr, tcp->port);
             }
@@ -317,11 +317,15 @@ static void GBASIOTCPSocketProcessEvents(struct mTiming* timing, void* context, 
                 tcp->nextState = TCP_STATE_DISCONNECTED;
                 break;
             }
-            GBASIOTCPSocketReadPacketFromServer(tcp);
-            if (peekTcpData(tcp->dataToSendToServerQueue)) {
-                struct TcpData* data = popTcpData(tcp->dataToSendToServerQueue);
-                GBASIOTCPSocketSendPacketToServer(tcp, data);
-                free(data);
+            tcp->tcpPollCounter++;
+            if (tcp->tcpPollCounter >= TCP_POLL_INTERVAL) {
+                tcp->tcpPollCounter = 0;
+                GBASIOTCPSocketReadPacketFromServer(tcp);
+                while (peekTcpData(tcp->dataToSendToServerQueue)) {
+                    struct TcpData* data = popTcpData(tcp->dataToSendToServerQueue);
+                    GBASIOTCPSocketSendPacketToServer(tcp, data);
+                    free(data);
+                }
             }
             break;
         case TCP_STATE_DISCONNECTED:
@@ -402,11 +406,11 @@ static uint32_t GBASIOTCPSocketFinishNormal32(struct GBASIODriver* driver) {
             if (!tcp->isExpectingIncomingData && header == TCP_RECEIVE_FROM_GBA) {
                 tcp->isExpectingIncomingData = true;
                 tcp->expectedIncomingBytesToRead = length;
-                mLOG(GBA_SIO, INFO, "TCP Socket Driver: Expecting %d bytes of data from the GBA", length);
+                mLOG(GBA_SIO, DEBUG, "TCP Socket Driver: Expecting %d bytes of data from the GBA", length);
             }
             else if (tcp->isExpectingIncomingData) {
                 // the incoming 32 bit value should be four 8 bit bytes of data
-                mLOG(GBA_SIO, INFO, "TCP Socket Driver: Received the value %d from the GBA", tcp->inValue);
+                mLOG(GBA_SIO, DEBUG, "TCP Socket Driver: Received the value %d from the GBA", tcp->inValue);
                 
                 // only copy the bytes that are expected, dont copy bytes beyond the expected length
                 uint8_t bytesToCopy = tcp->expectedIncomingBytesToRead - tcp->incomingDataBufferCount;
@@ -416,7 +420,7 @@ static uint32_t GBASIOTCPSocketFinishNormal32(struct GBASIODriver* driver) {
                 memcpy(tcp->incomingDataBuffer + tcp->incomingDataBufferCount, (uint8_t*)&tcp->inValue, bytesToCopy);
                 tcp->incomingDataBufferCount += bytesToCopy;
                 if (tcp->incomingDataBufferCount >= tcp->expectedIncomingBytesToRead) {
-                    mLOG(GBA_SIO, INFO, "TCP Socket Driver: Received %d bytes of data from the GBA", tcp->expectedIncomingBytesToRead);
+                    mLOG(GBA_SIO, DEBUG, "TCP Socket Driver: Received %d bytes of data from the GBA", tcp->expectedIncomingBytesToRead);
 
                     // we have received all the expected data, send it to the server
                     TcpDataQueuePush(tcp->dataToSendToServerQueue, tcp->incomingDataBuffer, tcp->expectedIncomingBytesToRead);
